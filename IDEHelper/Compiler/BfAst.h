@@ -401,6 +401,7 @@ class BfBoxExpression;
 class BfDelegateBindExpression;
 class BfLambdaBindExpression;
 class BfCastExpression;
+class BfGenericParameterDeclaration;
 class BfGenericParamsDeclaration;
 class BfThisExpression;
 class BfBaseExpression;
@@ -525,6 +526,7 @@ public:
 	virtual void Visit(BfPreprocessorDefinedExpression* definedExpr);
 
 	virtual void Visit(BfAttributeDirective* attributeDirective);
+	virtual void Visit(BfGenericParameterDeclaration* genericParameter);
 	virtual void Visit(BfGenericParamsDeclaration* genericParams);
 	virtual void Visit(BfGenericOperatorConstraint* genericConstraints);
 	virtual void Visit(BfGenericConstraintsDeclaration* genericConstraints);
@@ -3064,13 +3066,23 @@ public:
 	BfTokenNode* mModToken; // 'Params'
 };	BF_AST_DECL(BfParameterDeclaration, BfVariableDeclaration);
 
+class BfGenericParameterDeclaration : public BfAstNode
+{
+public:
+	BF_AST_TYPE(BfGenericParameterDeclaration, BfAstNode);
+	ASTREF(BfIdentifierNode*) mName;
+	ASTREF(BfTokenNode*) mEqualsNode;
+	BfAstNode* mDefaultValue;
+	BfTokenNode* mModToken; // 'Params'
+};	BF_AST_DECL(BfGenericParameterDeclaration, BfAstNode);
+
 class BfGenericParamsDeclaration : public BfAstNode
 {
 public:
 	BF_AST_TYPE(BfGenericParamsDeclaration, BfAstNode);
 
 	ASTREF(BfTokenNode*) mOpenChevron;
-	BfSizedArray<ASTREF(BfIdentifierNode*)> mGenericParams;
+	BfSizedArray<ASTREF(BfGenericParameterDeclaration*)> mGenericParams;
 	BfSizedArray<ASTREF(BfAstNode*)> mCommas;
 	ASTREF(BfTokenNode*) mCloseChevron;
 };	BF_AST_DECL(BfGenericParamsDeclaration, BfAstNode);

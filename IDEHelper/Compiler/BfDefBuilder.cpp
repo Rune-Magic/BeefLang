@@ -185,15 +185,19 @@ void BfDefBuilder::ParseGenericParams(BfGenericParamsDeclaration* genericParamsD
 		int startIdx = (int)genericParams.size();
 		for (int genericParamIdx = 0; genericParamIdx < (int)genericParamsDecl->mGenericParams.size(); genericParamIdx++)
 		{
-			BfIdentifierNode* genericParamNode = genericParamsDecl->mGenericParams[genericParamIdx];
-			String name = genericParamNode->ToString();
+			BfGenericParameterDeclaration* genericParameter = genericParamsDecl->mGenericParams[genericParamIdx];
+			BfIdentifierNode* genericParamName = genericParameter->mName;
+			String name = genericParamName->ToString();
 
 			for (int checkParamsIdx = startIdx; checkParamsIdx < (int)genericParams.size(); checkParamsIdx++)
 			{
-				if (genericParams[checkParamsIdx]->mName == name)
-				{
-					Fail("Duplicate generic param name", genericParamNode);
-				}
+				BfGenericParamDef* current = genericParams[checkParamsIdx];
+				if (current->mName == name)
+					Fail("Duplicate generic param name", genericParameter);
+				if (current->mDefaultValue != NULL && genericParameter->mDefaultValue == NULL)
+					Fail("Generic param must have a default value", genericParameter);
+				if (current->hasParamsModifier)
+					Fail("Generic param not allowed after 'params'", genericParameter);
 			}
 
 			auto checkTypeDef = mCurTypeDef;
@@ -205,7 +209,7 @@ void BfDefBuilder::ParseGenericParams(BfGenericParamsDeclaration* genericParamsD
 					{
 						if (checkTypeDef->mGenericParamDefs[checkParamsIdx]->mName == name)
 						{
-							mPassInstance->Warn(0, "Generic param name has same name as generic param from outer type", genericParamNode);
+							mPassInstance->Warn(0, "Generic param name has same name as generic param from outer type", genericParamName);
 						}
 					}
 				}
@@ -215,8 +219,10 @@ void BfDefBuilder::ParseGenericParams(BfGenericParamsDeclaration* genericParamsD
 
 			auto genericParamDef = new BfGenericParamDef();
 			genericParamDef->mName = name;
-			genericParamDef->mNameNodes.Add(genericParamNode);
+			genericParamDef->mNameNodes.Add(genericParamName);
 			genericParamDef->mGenericParamFlags = BfGenericParamFlag_None;
+			genericParamDef->hasParamsModifier = genericParameter->mModToken != NULL;
+			genericParamDef->mDefaultValue = genericParameter->mDefaultValue;
 			genericParams.push_back(genericParamDef);
 		}
 	}

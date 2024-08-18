@@ -137,6 +137,7 @@ public:
 	virtual void Visit(BfPreprocessorNode* preprocessorNode) override;
 
 	virtual void Visit(BfAttributeDirective* attributeDirective) override;
+	virtual void Visit(BfGenericParameterDeclaration* genericParameter) override;
 	virtual void Visit(BfGenericParamsDeclaration* genericParams) override;
 	virtual void Visit(BfGenericOperatorConstraint* genericConstraints) override;
 	virtual void Visit(BfGenericConstraintsDeclaration* genericConstraints) override;

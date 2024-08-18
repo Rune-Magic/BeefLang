@@ -788,6 +788,8 @@ class BfGenericParamDef : public BfConstraintDef
 public:
 	String mName;
 	Array<BfIdentifierNode*> mNameNodes; // 0 is always the def name
+	bool hasParamsModifier;
+	BfAstNode* mDefaultValue;
 
 	bool operator==(const BfGenericParamDef& other) const
 	{

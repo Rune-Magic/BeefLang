@@ -1189,6 +1189,25 @@ void BfPrinter::Visit(BfAttributeDirective* attributeDirective)
 	VisitChild(attributeDirective->mNextAttribute);
 }
 
+void BfPrinter::Visit(BfGenericParameterDeclaration* genericParameter)
+{
+	Visit(genericParameter->ToBase());
+
+	if (genericParameter->mModToken != NULL)
+	{
+		VisitChild(genericParameter->mModToken);
+		ExpectSpace();
+	}
+	VisitChild(genericParameter->mName);
+	if (genericParameter->mDefaultValue != NULL)
+	{
+		ExpectSpace();
+		VisitChild(genericParameter->mEqualsNode);
+		ExpectSpace();
+		VisitChild(genericParameter->mDefaultValue);
+	}
+}
+
 void BfPrinter::Visit(BfGenericParamsDeclaration* genericParams)
 {
 	Visit(genericParams->ToBase());

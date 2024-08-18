@@ -96,6 +96,11 @@ void BfStructuralVisitor::Visit(BfAttributeDirective* attributeDirective)
 	Visit(attributeDirective->ToBase());
 }
 
+void BfStructuralVisitor::Visit(BfGenericParameterDeclaration* genericParameter)
+{
+	Visit(genericParameter->ToBase());
+}
+
 void BfStructuralVisitor::Visit(BfGenericParamsDeclaration* genericParams)
 {
 	Visit(genericParams->ToBase());
