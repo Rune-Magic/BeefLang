@@ -1975,8 +1975,8 @@ public:
 	void GetDelegateTypeRefAttributes(BfDelegateTypeRef* delegateTypeRef, BfCallingConvention& callingConvention);
 	BfType* ResolveTypeRef(BfTypeReference* typeRef, BfPopulateType populateType = BfPopulateType_Data, BfResolveTypeRefFlags resolveFlags = (BfResolveTypeRefFlags)0, int numGenericArgs = 0);
 	BfType* ResolveTypeRefAllowUnboundGenerics(BfTypeReference* typeRef, BfPopulateType populateType = BfPopulateType_Data, BfResolveTypeRefFlags resolveFlags = (BfResolveTypeRefFlags)0, bool resolveGenericParam = true);
-	BfType* ResolveTypeRef_Type(BfAstNode* astNode, const BfSizedArray<BfAstNode*>* genericArgs, BfPopulateType populateType = BfPopulateType_Data, BfResolveTypeRefFlags resolveFlags = (BfResolveTypeRefFlags)0);
-	BfType* ResolveTypeRef(BfAstNode* astNode, const BfSizedArray<BfAstNode*>* genericArgs, BfPopulateType populateType = BfPopulateType_Data, BfResolveTypeRefFlags resolveFlags = (BfResolveTypeRefFlags)0);
+	BfType* ResolveTypeRef_Type(BfAstNode* astNode, const BfSizedArray<BfGenericArgNode*>* genericArgs, BfPopulateType populateType = BfPopulateType_Data, BfResolveTypeRefFlags resolveFlags = (BfResolveTypeRefFlags)0);
+	BfType* ResolveTypeRef(BfAstNode* astNode, const BfSizedArray<BfGenericArgNode*>* genericArgs, BfPopulateType populateType = BfPopulateType_Data, BfResolveTypeRefFlags resolveFlags = (BfResolveTypeRefFlags)0);
 	BfType* ResolveTypeDef(BfTypeDef* typeDef, BfPopulateType populateType = BfPopulateType_Data, BfResolveTypeRefFlags resolveFlags = BfResolveTypeRefFlag_None);
 	BfType* ResolveTypeDef(BfTypeDef* typeDef, const BfTypeVector& genericArgs, BfPopulateType populateType = BfPopulateType_Data, BfResolveTypeRefFlags resolveFlags = BfResolveTypeRefFlag_None);
 	BfType* ResolveInnerType(BfType* outerType, BfAstNode* typeRef, BfPopulateType populateType = BfPopulateType_Data, bool ignoreErrors = false, int numGenericArgs = 0, BfResolveTypeRefFlags resolveFlags = BfResolveTypeRefFlag_None);

@@ -56,6 +56,16 @@ void BfElementVisitor::Visit(BfAttributeDirective* attributeDirective)
 	VisitChild(attributeDirective->mNextAttribute);
 }
 
+void BfElementVisitor::Visit(BfGenericParameterDeclaration* genericParameter)
+{
+	Visit(genericParameter->ToBase());
+
+	VisitChild(genericParameter->mModToken);
+	VisitChild(genericParameter->mName);
+	VisitChild(genericParameter->mEqualsNode);
+	VisitChild(genericParameter->mDefaultValue);
+}
+
 void BfElementVisitor::Visit(BfGenericParamsDeclaration* genericParams)
 {
 	Visit(genericParams->ToBase());
@@ -100,6 +110,16 @@ void BfElementVisitor::Visit(BfGenericConstraintsDeclaration* genericConstraints
 			VisitChild(genericConstraintExpr->mExpression);
 		}
 	}
+}
+
+void BfElementVisitor::Visit(BfGenericArgNode* genericArg)
+{
+	Visit(genericArg->ToBase());
+
+	VisitChild(genericArg->mNamed);
+	VisitChild(genericArg->mColon);
+	VisitChild(genericArg->mUnpacker);
+	VisitChild(genericArg->mValue);
 }
 
 void BfElementVisitor::Visit(BfGenericArgumentsNode* genericArgumentsNode)

@@ -29,9 +29,11 @@ public:
 	virtual void Visit(BfPreprocessorDefinedExpression* definedExpr);
 
 	virtual void Visit(BfAttributeDirective* attributeDirective);
+	virtual void Visit(BfGenericParameterDeclaration* genericParameter);
 	virtual void Visit(BfGenericParamsDeclaration* genericParams);
 	virtual void Visit(BfGenericOperatorConstraint* genericConstraints);
 	virtual void Visit(BfGenericConstraintsDeclaration* genericConstraints);
+	virtual void Visit(BfGenericArgNode* genericArg);
 	virtual void Visit(BfGenericArgumentsNode* genericArgumentsNode);
 
 	virtual void Visit(BfEmptyStatement* emptyStmt);

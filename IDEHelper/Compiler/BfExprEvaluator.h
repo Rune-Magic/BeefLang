@@ -171,7 +171,7 @@ public:
 
 struct BfMethodGenericArguments
 {
-	BfSizedArray<BfAstNode*>* mArguments;
+	BfSizedArray<BfGenericArgNode*>* mArguments;
 	bool mIsPartial;
 	bool mIsOpen; // Ends with ...
 

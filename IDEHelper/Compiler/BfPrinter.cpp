@@ -1266,6 +1266,18 @@ void BfPrinter::Visit(BfGenericConstraintsDeclaration* genericConstraints)
 	}
 }
 
+void BfPrinter::Visit(BfGenericArgNode* genericArg)
+{
+	Visit(genericArg->ToBase());
+
+	VisitChild(genericArg->mNamed);
+	VisitChild(genericArg->mColon);
+	ExpectSpace();
+	VisitChild(genericArg->mUnpacker);
+	ExpectSpace();
+	VisitChild(genericArg->mValue);
+}
+
 void BfPrinter::Visit(BfGenericArgumentsNode* genericArgumentsNode)
 {
 	Visit(genericArgumentsNode->ToBase());

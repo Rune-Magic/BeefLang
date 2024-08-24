@@ -336,6 +336,7 @@ class BfAstNode;
 class BfScopeNode;
 class BfNewNode;
 class BfLabeledBlock;
+class BfGenericArgNode;
 class BfGenericArgumentsNode;
 class BfStatement;
 class BfLabelableStatement;
@@ -530,6 +531,7 @@ public:
 	virtual void Visit(BfGenericParamsDeclaration* genericParams);
 	virtual void Visit(BfGenericOperatorConstraint* genericConstraints);
 	virtual void Visit(BfGenericConstraintsDeclaration* genericConstraints);
+	virtual void Visit(BfGenericArgNode* genericArg);
 	virtual void Visit(BfGenericArgumentsNode* genericArgumentsNode);
 
 	virtual void Visit(BfEmptyStatement* emptyStmt);
@@ -2638,7 +2640,7 @@ public:
 	BF_AST_TYPE(BfGenericInstanceTypeRef, BfElementedTypeRef);
 
 	BfTokenNode* mOpenChevron;
-	BfSizedArray<BfAstNode*> mGenericArguments;
+	BfSizedArray<BfGenericArgNode*> mGenericArguments;
 	BfSizedArray<ASTREF(BfAstNode*)> mCommas;
 	BfTokenNode* mCloseChevron;
 	int GetGenericArgCount()
@@ -3087,13 +3089,24 @@ public:
 	ASTREF(BfTokenNode*) mCloseChevron;
 };	BF_AST_DECL(BfGenericParamsDeclaration, BfAstNode);
 
+class BfGenericArgNode : public BfAstNode
+{
+public:
+	BF_AST_TYPE(BfGenericArgNode, BfAstNode);
+
+	ASTREF(BfIdentifierNode*) mNamed;
+	ASTREF(BfTokenNode*) mColon;
+	ASTREF(BfAstNode*) mValue;
+	ASTREF(BfTokenNode*) mUnpacker;
+};	BF_AST_DECL(BfGenericArgNode, BfAstNode);
+
 class BfGenericArgumentsNode : public BfAstNode
 {
 public:
 	BF_AST_TYPE(BfGenericArgumentsNode, BfAstNode);
 
 	ASTREF(BfTokenNode*) mOpenChevron;
-	BfSizedArray<ASTREF(BfAstNode*)> mGenericArgs;
+	BfSizedArray<ASTREF(BfGenericArgNode*)> mGenericArgs;
 	BfSizedArray<ASTREF(BfAstNode*)> mCommas;
 	ASTREF(BfTokenNode*) mCloseChevron;
 };	BF_AST_DECL(BfGenericArgumentsNode, BfAstNode);

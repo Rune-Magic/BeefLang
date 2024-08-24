@@ -12748,7 +12748,7 @@ BfTypeInstance* BfModule::GetUnspecializedTypeInstance(BfTypeInstance* typeInst)
 	return result->ToTypeInstance();
 }
 
-BfType* BfModule::ResolveTypeRef_Type(BfAstNode* astNode, const BfSizedArray<BfAstNode*>* genericArgs, BfPopulateType populateType, BfResolveTypeRefFlags resolveFlags)
+BfType* BfModule::ResolveTypeRef_Type(BfAstNode* astNode, const BfSizedArray<BfGenericArgNode*>* genericArgs, BfPopulateType populateType, BfResolveTypeRefFlags resolveFlags)
 {
 	if ((genericArgs == NULL) || (genericArgs->size() == 0))
 	{
@@ -12811,7 +12811,7 @@ BfType* BfModule::ResolveTypeRef_Type(BfAstNode* astNode, const BfSizedArray<BfA
 		typeRef->mParent = genericInstanceTypeRef;
 #endif
 
-		BfDeferredAstSizedArray<BfAstNode*> arguments(genericInstanceTypeRef->mGenericArguments, &alloc);
+		BfDeferredAstSizedArray<BfGenericArgNode*> arguments(genericInstanceTypeRef->mGenericArguments, &alloc);
 
 		for (auto genericArg : *genericArgs)
 		{
@@ -12828,7 +12828,7 @@ BfType* BfModule::ResolveTypeRef_Type(BfAstNode* astNode, const BfSizedArray<BfA
 	return ResolveTypeRef(typeRef, populateType, resolveFlags);
 }
 
-BfType* BfModule::ResolveTypeRef(BfAstNode* astNode, const BfSizedArray<BfAstNode*>* genericArgs, BfPopulateType populateType, BfResolveTypeRefFlags resolveFlags)
+BfType* BfModule::ResolveTypeRef(BfAstNode* astNode, const BfSizedArray<BfGenericArgNode*>* genericArgs, BfPopulateType populateType, BfResolveTypeRefFlags resolveFlags)
 {
 	if (astNode == NULL)
 	{

@@ -215,7 +215,7 @@ void BfMethodMatcher::Init(const BfMethodGenericArguments& methodGenericArgument
 
 	if (methodGenericArguments.mArguments != NULL)
 	{
-		for (BfAstNode* genericArg : *(methodGenericArguments.mArguments))
+		for (auto genericArg : *(methodGenericArguments.mArguments))
 		{
 			BfType* genericArgType = NULL;
 			if (BfNodeIsA<BfUninitializedExpression>(genericArg))
@@ -19044,7 +19044,7 @@ void BfExprEvaluator::Visit(BfInvocationExpression* invocationExpr)
 			methodGenericArgs.mIsPartial = true;
 		}
 		for (int i = 0; i < (int)methodGenericArgs.mArguments->mSize; i++)
-			if (BfNodeIsA<BfUninitializedExpression>((*methodGenericArgs.mArguments)[i]))
+			if (BfNodeIsA<BfUninitializedExpression>((*methodGenericArgs.mArguments)[i]->mValue))
 				methodGenericArgs.mIsPartial = true;
 	}
 	SizedArray<BfExpression*, 8> copiedArgs;

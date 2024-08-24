@@ -116,6 +116,11 @@ void BfStructuralVisitor::Visit(BfGenericConstraintsDeclaration* genericConstrai
 	Visit(genericConstraints->ToBase());
 }
 
+void BfStructuralVisitor::Visit(BfGenericArgNode* genericArg)
+{
+	Visit(genericArg->ToBase());
+}
+
 void BfStructuralVisitor::Visit(BfGenericArgumentsNode* genericArgumentsNode)
 {
 	Visit(genericArgumentsNode->ToBase());

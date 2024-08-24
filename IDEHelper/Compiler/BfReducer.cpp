@@ -5353,116 +5353,21 @@ BfTypeReference* BfReducer::DoCreateTypeRef(BfAstNode* firstNode, CreateTypeRefF
 				}
 
 				auto genericInstance = mAlloc->Alloc<BfGenericInstanceTypeRef>();
-				BfDeferredSizedArray<BfAstNode*> genericArguments(genericInstance->mGenericArguments, mAlloc);
-				BfDeferredAstSizedArray<BfAstNode*> commas(genericInstance->mCommas, mAlloc);
 				ReplaceNode(typeRef, genericInstance);
 				genericInstance->mOpenChevron = tokenNode;
 				MoveNode(tokenNode, genericInstance);
 				genericInstance->mElementType = typeRef;
 				mVisitorPos.MoveNext();
 
-				bool isBoundName = false;
-				bool isUnboundName = false;
+				auto genericArgsDecl = CreateGenericArguments(tokenNode);
+				if (genericArgsDecl == NULL)
+					return NULL;
 
-				while (true)
-				{
-					auto nextNode = mVisitorPos.GetNext();
-					auto genericIdentifier = BfNodeDynCast<BfIdentifierNode>(nextNode);
-					bool doAddType = genericIdentifier != NULL;
-					bool addAsExpr = false;
-
-					if (BfNodeDynCast<BfLiteralExpression>(nextNode) != NULL)
-					{
-						doAddType = true;
-						addAsExpr = true;
-					}
-					else if (auto tokenNode = BfNodeDynCast<BfTokenNode>(nextNode))
-					{
-						if (tokenNode->mToken == BfToken_Minus)
-						{
-							doAddType = true;
-							addAsExpr = true;
-						}
-					}
-
-					if (genericIdentifier == NULL)
-					{
-						auto nextNode = mVisitorPos.GetNext();
-						tokenNode = BfNodeDynCast<BfTokenNode>(nextNode);
-						BfToken token = BfToken_None;
-						if (tokenNode != NULL)
-							token = tokenNode->GetToken();
-						if ((tokenNode != NULL) &&
-							((token == BfToken_Const) ||
-							(token == BfToken_Ref) ||
-								(token == BfToken_Mut) ||
-								(token == BfToken_LParen) ||
-								(token == BfToken_Delegate) ||
-								(token == BfToken_Function) ||
-								(token == BfToken_Comptype) ||
-								(token == BfToken_Decltype) ||
-								((token == BfToken_Star) && (mAllowTypeWildcard))))
-							doAddType = true;
-					}
-
-					if ((!doAddType) && (isBoundName))
-					{
-						FailAfter("Expected type", genericInstance);
-					}
-					if ((doAddType) && (!isUnboundName))
-					{
-						BfAstNode* genericArgumentTypeRef = NULL;
-
-						if (addAsExpr)
-						{
-							genericArgumentTypeRef = CreateExpressionAfter(genericInstance, CreateExprFlags_BreakOnRChevron);
-						}
-						else
-							genericArgumentTypeRef = CreateTypeRefAfter(genericInstance);
-						if (genericArgumentTypeRef == NULL)
-							return NULL;
-						MoveNode(genericArgumentTypeRef, genericInstance);
-						genericArguments.push_back(genericArgumentTypeRef);
-						isBoundName = true;
-					}
-					else
-						isUnboundName = true;
-
-					nextNode = mVisitorPos.GetNext();
-					tokenNode = BfNodeDynCast<BfTokenNode>(nextNode);
-					if (tokenNode == NULL)
-					{
-						FailAfter("Expected ',' or '>'", genericInstance);
-						return genericInstance;
-					}
-
-					token = tokenNode->GetToken();
-					if (token == BfToken_RDblChevron)
-					{
-						tokenNode = BreakDoubleChevron(tokenNode);
-						token = tokenNode->GetToken();
-					}
-					else
-					{
-						mVisitorPos.MoveNext();
-					}
-
-					if (token == BfToken_RChevron)
-					{
-						MoveNode(tokenNode, genericInstance);
-						genericInstance->mCloseChevron = tokenNode;
-						break;
-					}
-					if (token != BfToken_Comma)
-					{
-						Fail("Either ',' or '>' expected", tokenNode);
-						mVisitorPos.mReadPos--;
-						//AddErrorNode(tokenNode);
-						return genericInstance;
-					}
-					MoveNode(tokenNode, genericInstance);
-					commas.push_back(tokenNode);
-				}
+				MoveNode(genericArgsDecl, genericInstance);
+				genericArgsDecl->mOpenChevron = genericInstance->mOpenChevron;
+				genericArgsDecl->mGenericArgs = genericInstance->mGenericArguments;
+				genericArgsDecl->mCommas = genericInstance->mCommas;
+				genericArgsDecl->mCloseChevron = genericInstance->mCloseChevron;
 
 				typeRef = genericInstance;
 			}
@@ -10068,7 +9973,7 @@ bool BfReducer::ParseMethod(BfMethodDeclaration* methodDeclaration, SizedArrayIm
 	return true;
 }
 
-BfAstNode* BfReducer::CreateGenericArgAfter(BfAstNode* parent)
+BfAstNode* BfReducer::CreateGenericArgValueAfter(BfAstNode* parent)
 {
 	bool doAsExpr = false;
 	auto nextNode = mVisitorPos.GetNext();
@@ -10091,15 +9996,49 @@ BfAstNode* BfReducer::CreateGenericArgAfter(BfAstNode* parent)
 BfGenericArgumentsNode* BfReducer::CreateGenericArguments(BfTokenNode* tokenNode, bool allowPartial)
 {
 	auto genericArgs = mAlloc->Alloc<BfGenericArgumentsNode>();
-	BfDeferredAstSizedArray<BfAstNode*> genericArgsArray(genericArgs->mGenericArgs, mAlloc);
+	BfDeferredAstSizedArray<BfGenericArgNode*> genericArgsArray(genericArgs->mGenericArgs, mAlloc);
 	BfDeferredAstSizedArray<BfAstNode*> commas(genericArgs->mCommas, mAlloc);
 	ReplaceNode(tokenNode, genericArgs);
 	genericArgs->mOpenChevron = tokenNode;
 
 	while (true)
 	{
-		auto genericArg = CreateGenericArgAfter(genericArgs);
-		if (genericArg == NULL)
+		auto genericArg = mAlloc->Alloc<BfGenericArgNode>();
+
+		{
+			int startPos = mVisitorPos.mReadPos;
+			auto nextNode = mVisitorPos.GetNext();
+			auto identifier = BfNodeDynCast<BfIdentifierNode>(nextNode);
+			if (identifier != NULL)
+			{
+				nextNode = mVisitorPos.GetNext();
+				auto colon = BfNodeDynCast<BfTokenNode>(nextNode);
+				if (colon != NULL && colon->GetToken() == BfToken_Colon)
+				{
+					MoveNode(identifier, genericArg);
+					MoveNode(colon, genericArg);
+					genericArg->mNamed = identifier;
+					genericArg->mColon = colon;
+				}
+				else mVisitorPos.mReadPos = startPos;
+			}
+			else mVisitorPos.mReadPos = startPos;
+		}
+
+		{
+			int startPos = mVisitorPos.mReadPos;
+			auto nextNode = mVisitorPos.GetNext();
+			auto params = BfNodeDynCast<BfTokenNode>(nextNode);
+			if (params != NULL && params->GetToken() == BfToken_Params)
+			{
+				MoveNode(params, genericArg);
+				genericArg->mUnpacker = params;
+			}
+			else mVisitorPos.mReadPos = startPos;
+		}
+
+		auto genericArgValue = CreateGenericArgValueAfter(genericArgs);
+		if (genericArgValue == NULL)
 		{
 			genericArgsArray.push_back(NULL); // Leave empty for purposes of generic argument count
 
@@ -10120,6 +10059,10 @@ BfGenericArgumentsNode* BfReducer::CreateGenericArguments(BfTokenNode* tokenNode
 
 			return genericArgs;
 		}
+
+		MoveNode(genericArgValue, genericArg);
+		genericArg->mValue = genericArgValue;
+
 		MoveNode(genericArg, genericArgs);
 		genericArgsArray.push_back(genericArg);
 
@@ -10212,7 +10155,7 @@ BfGenericParamsDeclaration* BfReducer::CreateGenericParamsDeclaration(BfTokenNod
 				return genericParams;
 			}
 
-			auto defaultValue = CreateGenericArgAfter(genericParameterNode);
+			auto defaultValue = CreateGenericArgValueAfter(genericParameterNode);
 			MoveNode(defaultValue, genericParameterNode);
 			genericParameterNode->mDefaultValue = defaultValue;
 

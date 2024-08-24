@@ -141,6 +141,7 @@ public:
 	virtual void Visit(BfGenericParamsDeclaration* genericParams) override;
 	virtual void Visit(BfGenericOperatorConstraint* genericConstraints) override;
 	virtual void Visit(BfGenericConstraintsDeclaration* genericConstraints) override;
+	virtual void Visit(BfGenericArgNode* genericArg) override;
 	virtual void Visit(BfGenericArgumentsNode* genericArgumentsNode) override;
 
 	virtual void Visit(BfEmptyStatement* emptyStmt) override;

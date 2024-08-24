@@ -229,7 +229,7 @@ public:
 	BfTypeReference* CreateTypeRefAfter(BfAstNode* astNode, CreateTypeRefFlags createTypeRefFlags = CreateTypeRefFlags_None);
 	BfTypeReference* CreateRefTypeRef(BfTypeReference* elementType, BfTokenNode* refToken);
 	bool ParseMethod(BfMethodDeclaration* methodDeclaration, SizedArrayImpl<BfParameterDeclaration*>* params, SizedArrayImpl<BfTokenNode*>* commas, bool alwaysIncludeBlock = false);
-	BfAstNode* CreateGenericArgAfter(BfAstNode* parent);
+	BfAstNode* CreateGenericArgValueAfter(BfAstNode* parent);
 	BfGenericArgumentsNode* CreateGenericArguments(BfTokenNode* tokenNode, bool allowPartial = false);
 	BfGenericParamsDeclaration* CreateGenericParamsDeclaration(BfTokenNode* tokenNode);
 	BfGenericConstraintsDeclaration* CreateGenericConstraintsDeclaration(BfTokenNode* tokenNode);
