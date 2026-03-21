@@ -168,9 +168,15 @@ namespace IDE
 				case "Linux32":
 					outTriple.Append("i686-unknown-linux-gnu");
 				case "Linux64":
-					outTriple.Append("x86_64-unknown-linux-gnu");
+					if (IDEApp.sArch64Name == "aarch64")
+						outTriple.Append("aarch64-unknown-linux-gnu");
+					else
+						outTriple.Append("x86_64-unknown-linux-gnu");
 				case "macOS":
-					outTriple.Append("x86_64-apple-macosx10.8.0");
+					if (IDEApp.sArch64Name == "aarch64")
+						outTriple.Append("aarch64-apple-macosx11.0.0");
+					else
+						outTriple.Append("x86_64-apple-macosx10.8.0");
 				case "iOS":
 					outTriple.Append("arm64-apple-ios");
 				case "wasm32":

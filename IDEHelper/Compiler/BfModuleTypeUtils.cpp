@@ -2750,6 +2750,11 @@ void BfModule::HandleCEAttributes(CeEmitContext* ceEmitContext, BfTypeInstance* 
 
 void BfModule::CEMixin(BfAstNode* refNode, const StringImpl& code)
 {
+	if ((mCurMethodState != NULL) && (mCurMethodState->mMixinState != NULL))
+	{
+		refNode = mCurMethodState->mMixinState->mSource;
+	}
+
 	if (code.IsEmpty())
 		return;
 
@@ -3545,6 +3550,43 @@ void BfModule::DoPopulateType_TypeAlias(BfTypeAliasType* typeAlias)
  	if ((typeAlias->mAliasToType != NULL) && (typeAlias->mAliasToType != aliasToType) && (!typeAlias->mDependencyMap.IsEmpty()))
  		mContext->QueueMidCompileRebuildDependentTypes(typeAlias, "type alias remapped");
 
+	if (aliasToType != NULL)
+	{
+		int aliasDepth = 0;
+		HashSet<BfType*> seenAliases;
+		bool isRecursive = false;
+
+		BfType* resolvedTypeRef = aliasToType;
+		while ((resolvedTypeRef != NULL) && (resolvedTypeRef->IsTypeAlias()))
+		{
+			if (resolvedTypeRef == typeAlias)
+			{
+				isRecursive = true;
+				break;
+			}
+			aliasDepth++;
+			if (aliasDepth > 8)
+			{
+				if (!seenAliases.Add(resolvedTypeRef))
+				{
+					isRecursive = true;
+					break;
+				}
+			}
+
+			resolvedTypeRef = resolvedTypeRef->GetUnderlyingType();
+		}
+		
+		if (isRecursive)
+		{
+			BfAstNode* refNode = typeAliasDecl;
+			if (typeAliasDecl->mAliasToType)
+				refNode = typeAliasDecl->mAliasToType;
+			Fail(StrFormat("Type alias '%s' has a recursive definition", TypeToString(aliasToType).c_str()), refNode);
+			aliasToType = NULL;
+		}
+	}
+	
 	typeAlias->mAliasToType = aliasToType;
 
 	if (aliasToType != NULL)
@@ -6981,8 +7023,9 @@ void BfModule::DoTypeInstanceMethodProcessing(BfTypeInstance* typeInstance)
 
 				methodInstance = moduleMethodInstance.mMethodInstance;
 				if (methodInstance == NULL)
-				{
-					BF_ASSERT(typeInstance->IsGenericTypeInstance() && (typeInstance->mTypeDef->mIsCombinedPartial));
+				{					
+					BF_ASSERT(typeInstance->IsBoxed() ||
+						(typeInstance->IsGenericTypeInstance() && (typeInstance->mTypeDef->mIsCombinedPartial)));
 					continue;
 				}
 
@@ -8525,6 +8568,8 @@ BfTypeInstance* BfModule::SantizeTupleType(BfTypeInstance* tupleType)
 
 BfRefType* BfModule::CreateRefType(BfType* resolvedTypeRef, BfRefType::RefKind refKind)
 {
+	BF_ASSERT(!resolvedTypeRef->IsDeleting());
+
 	auto refType = mContext->mRefTypePool.Get();
 	refType->mContext = mContext;
 	refType->mElementType = resolvedTypeRef;
@@ -8577,9 +8622,9 @@ BfType* BfModule::ResolveTypeDef(BfTypeDef* typeDef, BfPopulateType populateType
 
 	//BF_ASSERT(typeDef->mTypeCode != BfTypeCode_Extension);
 	BF_ASSERT(!typeDef->mIsPartial || typeDef->mIsCombinedPartial);
-
-	BF_ASSERT(typeDef->mDefState != BfTypeDef::DefState_Deleted);
-	BF_ASSERT((typeDef->mOuterType == NULL) || (typeDef->mOuterType->mDefState != BfTypeDef::DefState_Deleted));
+	
+	BF_ASSERT((typeDef->mDefState != BfTypeDef::DefState_Deleted) || ((resolveFlags & BfResolveTypeRefFlag_AllowDeletedTypeDef) != 0));
+	BF_ASSERT((typeDef->mOuterType == NULL) || (typeDef->mOuterType->mDefState != BfTypeDef::DefState_Deleted) || ((resolveFlags & BfResolveTypeRefFlag_AllowDeletedTypeDef) != 0));
 
 	if (typeDef->mGenericParamDefs.size() != 0)
 		return ResolveTypeDef(typeDef, BfTypeVector(), populateType, resolveFlags);
@@ -8874,7 +8919,7 @@ BfTypeInstance* BfModule::GetOuterType(BfType* type)
 	typeGenericArguments.resize(outerTypeDef->mGenericParamDefs.size());
 
 	//auto outerType = ResolveTypeDef(outerTypeDef, typeGenericArguments, BfPopulateType_Declaration);
-	auto outerType = ResolveTypeDef(outerTypeDef, typeGenericArguments, BfPopulateType_Identity);
+	auto outerType = ResolveTypeDef(outerTypeDef, typeGenericArguments, BfPopulateType_Identity, BfResolveTypeRefFlag_AllowDeletedTypeDef);
 	if (outerType == NULL)
 		return NULL;
 	return outerType->ToTypeInstance();

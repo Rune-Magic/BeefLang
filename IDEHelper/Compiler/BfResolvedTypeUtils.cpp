@@ -632,7 +632,7 @@ int BfFieldInstance::GetAlign(int packing)
 				{
 					BfIRConstHolder* constHolder = module->mCurTypeInstance->mConstHolder;
 					auto constant = constHolder->GetConstant(attrib.mCtorArgs[0]);
-					if (constant != NULL)
+					if ((constant != NULL) && (constant->mConstType != BfConstType_Undef))
 					{
 						int alignOverride = (int)BF_MAX(1, constant->mInt64);
 						if ((alignOverride & (alignOverride - 1)) == 0)
@@ -2197,6 +2197,15 @@ bool BfTypeInstance::GetLoweredType(BfTypeUsage typeUsage, BfTypeCode* outTypeCo
 				bool writeOutCode = (typeUsage != BfTypeUsage_Return_NonStatic) && (typeUsage != BfTypeUsage_Return_Static);
 
 				if ((types[0] == BfTypeCode_Float) &&
+					(types[1] == BfTypeCode_None)  &&
+				    (types[2] == BfTypeCode_None))
+				{
+					if ((outTypeCode != NULL) && (writeOutCode))
+						*outTypeCode = BfTypeCode_FloatX1;
+					return true;
+				}
+
+				if ((types[0] == BfTypeCode_Float) &&
 					(types[1] == BfTypeCode_Float) &&
 					(types[2] == BfTypeCode_None))
 				{
@@ -2223,6 +2232,14 @@ bool BfTypeInstance::GetLoweredType(BfTypeUsage typeUsage, BfTypeCode* outTypeCo
 				{
 					if ((outTypeCode != NULL) && (writeOutCode))
 						*outTypeCode = BfTypeCode_FloatX4;
+					return true;
+				}
+
+				if ((types[0] == BfTypeCode_Double) &&
+					(types[2] == BfTypeCode_None))
+				{
+					if ((outTypeCode != NULL) && (writeOutCode))
+						*outTypeCode = BfTypeCode_DoubleX1;
 					return true;
 				}
 
@@ -2732,6 +2749,15 @@ bool BfTypeInstance::HasVarConstraints()
 
 bool BfTypeInstance::IsTypeMemberIncluded(BfTypeDef* typeDef, BfTypeDef* activeTypeDef, BfModule* module)
 {
+	if (IsBoxed())
+	{
+		auto boxedType = (BfBoxedType*)this;		
+		auto unboxedTypeInst = boxedType->mElementType->ToTypeInstance();
+		if (unboxedTypeInst != NULL)
+			return unboxedTypeInst->IsTypeMemberIncluded(typeDef, activeTypeDef, module);
+		return false;
+	}
+
 	if (mGenericTypeInfo == NULL)
 		return true;
 	if (mGenericTypeInfo->mGenericExtensionInfo == NULL)
@@ -3610,7 +3636,7 @@ void BfResolvedTypeSet::HashGenericArguments(BfTypeReference* typeRef, LookupCon
 			int argHashVal = 0;
 			if (genericArgTypeRef != NULL)
 			{
-				argHashVal = Hash(genericArgTypeRef, ctx, BfHashFlag_AllowGenericParamConstValue, hashSeed + 1);
+				argHashVal = Hash(genericArgTypeRef, ctx, (BfHashFlags)(BfHashFlag_AllowGenericParamConstValue | BfHashFlag_DisallowUnknownSizedArray), hashSeed + 1);
 				if ((allowUnboundGeneric) && ((ctx->mResolveFlags & BfResolveTypeRefFlag_ForceUnboundGeneric) != 0))
 					genericArgTypeRef = NULL;
 			}
@@ -4029,9 +4055,13 @@ int BfResolvedTypeSet::DoHash(BfTypeReference* typeRef, LookupContext* ctx, BfHa
 					else if (constant->mConstType == BfConstType_Undef)
 					{
 						elementCount = -1; // Marker for undef
-						if ((arrayType->IsInferredSize()) && ((ctx->mResolveFlags & BfResolveTypeRefFlag_AllowInferredSizedArray) == 0))
-						{
+						if ((arrayType->IsInferredSize()) && 
+							(((ctx->mResolveFlags & BfResolveTypeRefFlag_AllowInferredSizedArray) == 0) ||
+							 ((flags & BfHashFlag_DisallowUnknownSizedArray) != 0)))
+						{							
 							ctx->mModule->Fail("Invalid use of inferred-sized array", sizeExpr);
+							if ((flags & BfHashFlag_DisallowUnknownSizedArray) != 0)
+								ctx->mFailed = true;
 						}
 					}
 					else if (!BfIRBuilder::IsInt(constant->mTypeCode))

@@ -210,7 +210,7 @@ namespace System
 		extern const Type* sTypes;
 		extern static int32 sTypeCount;
 
-		protected const BindingFlags cDefaultLookup = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public;
+		protected const BindingFlags cDefaultLookup = .Instance | .Static | .Public | .NonPublic;
 
 		protected int32 mSize;
 		protected TypeId mTypeId;
@@ -1074,9 +1074,11 @@ namespace System
 	    Enum,
 		TypeAlias,
 		Extension,
+		FloatX1,
 		FloatX2,
 		FloatX3,
 		FloatX4,
+		DoubleX1,
 		DoubleX2,
 		DoubleX3,
 		DoubleX4,

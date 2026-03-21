@@ -28,6 +28,8 @@ namespace Tests
 				mA = a;
 				mB = b;
 			}
+
+			public int GetA() => mA;
 		}
 
 		struct StructC
@@ -153,6 +155,29 @@ namespace Tests
 			return sn;
 		}
 
+		public struct StructS
+		{
+			public int mA = 123;
+			public static StructS* sPtr;
+
+			public this()
+			{
+				sPtr = &this;
+			}
+		}
+
+		public struct StructT
+		{
+			public int mA = 234;
+			public int mB = ?;
+			public StructS mS = .();
+
+			public this()
+			{
+				mB++;
+			}
+		}
+
 		[Test]
 		static void TestBasics()
 		{
@@ -171,6 +196,10 @@ namespace Tests
 			sb0 = .{ mA = 3, mB = 4 };
 			Test.Assert(sb0.mA == 3);
 			Test.Assert(sb0.mB == 4);
+
+			StructB sb2;
+			sb2.this(100, 200);
+			Test.Assert(sb2.GetA() == 100);
 
 			StructL sl = .(12, 23);
 			Test.Assert(sl.a == 12);
@@ -203,6 +232,14 @@ namespace Tests
 			count = ptr9B - ptr0;
 			Test.Assert(ptr9 == ptr9B);
 			Test.Assert(count == 9);
+
+			StructT st = .();
+			Test.Assert(&st.mS == StructS.sPtr);
+
+			st.mB = 300;
+			st.this();
+			Test.Assert(&st.mS == StructS.sPtr);
+			Test.Assert(st.mB == 301);
 		}
 
 		[Align(16)]
@@ -227,6 +264,19 @@ namespace Tests
 			int8 mA;
 			int32 mB;
 		}
+
+		[Align(alignof(T))]
+		struct StructG<T>
+		{
+			int8 mA;
+		}
+
+		[Align(CVal)]
+		struct StructV<CVal> where CVal : const int
+		{
+			int8 mA;
+		}
+		
 
 		[Test]
 		static void TestLayouts()
@@ -274,6 +324,15 @@ namespace Tests
 			Test.Assert(sizeof(StructR) == 6);
 			Test.Assert(alignof(StructR) == 2);
 			Test.Assert(strideof(StructR) == 6);
+
+			Test.Assert(sizeof(StructG<int32>) == 1);
+			Test.Assert(alignof(StructG<int32>) == 4);
+			Test.Assert(strideof(StructG<int32>) == 4);
+
+			Test.Assert(sizeof(StructV<const 16>) == 1);
+			Test.Assert(alignof(StructV<const 16>) == 16);
+			Test.Assert(strideof(StructV<const 16>) == 16);
+
 		}
 
 		public int Test<T>(T val)

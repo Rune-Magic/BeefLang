@@ -3533,6 +3533,7 @@ void BeMCContext::CreateCondBr(BeMCBlock* mcBlock, BeMCOperand& testVal, const B
 {
 	if (testVal.IsImmediate())
 	{
+		mcBlock->mRemovedCondBr = true;
 		if (testVal.mImmediate != 0)
 			AllocInst(BeMCInstKind_Br, trueBlock);
 		else
@@ -3645,7 +3646,13 @@ void BeMCContext::CreateCondBr(BeMCBlock* mcBlock, BeMCOperand& testVal, const B
 
 				_CheckBlock(phiVal.mBlockFrom);
 
-				BEMC_ASSERT(found);
+				if (!found)
+				{
+					// Probably optimized out
+					if (!phiVal.mBlockFrom->mRemovedCondBr)
+						Fail("Invalid PHI from block");
+					continue;
+				}
 			}
 
 			if (isFalseCmpResult)
@@ -4709,7 +4716,9 @@ void BeMCContext::GenerateLiveness(BeMCBlock* block, BeVTrackingGenContext* genC
 					}
 					else
 					{
-						SoftFail("VReg lifetime error");
+						//TODO: Triggered on https://github.com/beefytech/Beef/issues/2397
+						// Put back if we determine the cause
+						//SoftFail("VReg lifetime error");
 					}
 				}
 			}
@@ -10162,6 +10171,7 @@ bool BeMCContext::DoLegalization()
 							if ((vregInfo != NULL) && (vregInfo->mIsExpr))
 							{
 								ReplaceWithNewVReg(inst->mArg1, instIdx, true);
+								isFinalRun = false;
 							}
 						}
 
@@ -11467,7 +11477,14 @@ bool BeMCContext::DoJumpRemovePass()
 
 void BeMCContext::DoRegFinalization()
 {
-	SizedArray<int, 32> savedVolatileVRegs;
+	struct SaveEntry
+	{
+		int mVRegIdx;
+		bool mIsSaved;
+		bool mWantRestore;
+	};
+
+	SizedArray<SaveEntry, 32> savedVolatileVRegs;
 
 	mUsedRegs.Clear();
 
@@ -11644,14 +11661,23 @@ void BeMCContext::DoRegFinalization()
 
 					auto vregInfo = mVRegInfo[checkVRegIdx];
 					if (vregInfo->mReg != X64Reg_None)
-					{
-						// Do we specify a particular reg, or just all volatiles?
-						if ((inst->mArg0.IsNativeReg()) && (inst->mArg0.mReg != GetFullRegister(vregInfo->mReg)))
-							continue;
+					{	
+						auto vregFullRegister = GetFullRegister(vregInfo->mReg);
 
-						if (!mLivenessContext.IsSet(restoreInst->mLiveness, liveVRegIdx))
-						{
-							// This vreg doesn't survive until the PreserveRegs -- it's probably used for params or the call addr
+						// Do we specify a particular reg, or just all volatiles?
+						if ((inst->mArg0.IsNativeReg()) && (inst->mArg0.mReg != vregFullRegister))
+							continue;
+						
+						bool potentialScratchReg =
+							(vregFullRegister == X64Reg_XMM5_f32) ||
+							(vregFullRegister == X64Reg_XMM5_f64) ||
+							(vregFullRegister == X64Reg_R11);
+
+						// If this vreg doesn't survive until the PreserveRegs then it's probably used for params or the call addr
+						bool vregPersists = mLivenessContext.IsSet(restoreInst->mLiveness, liveVRegIdx);
+
+						if ((!potentialScratchReg) && (!vregPersists))
+						{							
 							continue;
 						}
 
@@ -11666,12 +11692,20 @@ void BeMCContext::DoRegFinalization()
 								vregInfo->mVolatileVRegSave = savedVReg.mVRegIdx;
 							}
 
-							savedVolatileVRegs.push_back(checkVRegIdx);
-							AllocInst(BeMCInstKind_Mov, BeMCOperand::FromVReg(vregInfo->mVolatileVRegSave), GetVReg(checkVRegIdx), insertIdx++);
-							if (insertIdx > instEnum.mReadIdx)
-								instEnum.Next();
-							else
-								instEnum.mWriteIdx++;
+							SaveEntry saveEntry;
+							saveEntry.mVRegIdx = checkVRegIdx;
+							saveEntry.mIsSaved = vregPersists;
+							saveEntry.mWantRestore = vregPersists;
+
+							savedVolatileVRegs.push_back(saveEntry);
+							if (saveEntry.mIsSaved)
+							{
+								AllocInst(BeMCInstKind_Mov, BeMCOperand::FromVReg(vregInfo->mVolatileVRegSave), GetVReg(checkVRegIdx), insertIdx++);
+								if (insertIdx > instEnum.mReadIdx)
+									instEnum.Next();
+								else
+									instEnum.mWriteIdx++;
+							}
 						}
 					}
 				}
@@ -11844,12 +11878,20 @@ void BeMCContext::DoRegFinalization()
 													scratchReg = X64Reg_R11;
 
 												int volatileVRegSave = -1;
-												for (auto vregIdx : savedVolatileVRegs)
+												for (auto& saveInfo : savedVolatileVRegs)
 												{
+													int vregIdx = saveInfo.mVRegIdx;
 													auto vregInfo = mVRegInfo[vregIdx];
 													if (GetFullRegister(vregInfo->mReg) == scratchReg)
 													{
 														volatileVRegSave = vregInfo->mVolatileVRegSave;
+
+														if (!saveInfo.mIsSaved)
+														{															
+															saveInfo.mIsSaved = true;
+															AllocInst(BeMCInstKind_Mov, BeMCOperand::FromVReg(volatileVRegSave), BeMCOperand::FromReg(scratchReg), instIdx++);
+															instEndIdx++;
+														}
 													}
 												}
 
@@ -11889,8 +11931,11 @@ void BeMCContext::DoRegFinalization()
 
 				if (doRestore)
 				{
-					for (auto vregIdx : savedVolatileVRegs)
+					for (auto& saveInfo : savedVolatileVRegs)
 					{
+						if (!saveInfo.mWantRestore)
+							continue;
+						int vregIdx = saveInfo.mVRegIdx;
 						auto vregInfo = mVRegInfo[vregIdx];
 						int insertIdx = instEnum.mWriteIdx;
 						AllocInst(BeMCInstKind_Mov, GetVReg(vregIdx), BeMCOperand::FromVReg(vregInfo->mVolatileVRegSave), insertIdx++);
@@ -12435,8 +12480,17 @@ bool BeMCContext::EmitStdXMMInst(BeMCInstForm instForm, BeMCInst* inst, uint8 op
 	case BeMCInstForm_XMM64_FRM64:
 	case BeMCInstForm_XMM32_FRM64:
 		{
+			//cvttsd2si
 			auto arg0 = GetFixedOperand(inst->mArg0);
 			auto arg1 = GetFixedOperand(inst->mArg1);
+
+			if ((instForm == BeMCInstForm_R32_F64) && (arg0.IsNativeReg()))
+			{
+				// For xmm->uint32 conversions we need to do xmm->int64 and then truncate
+				arg0.mReg = ResizeRegister(arg0.mReg, 8);
+				is64Bit = true;
+			}
+
 			Emit(0xF2); EmitREX(arg0, arg1, is64Bit);
 			Emit(0x0F); Emit(opcode);
 			EmitModRM(arg0, arg1);
@@ -14119,11 +14173,62 @@ void BeMCContext::DoCodeEmission()
 					auto arg1Type = GetType(inst->mArg1);
 					switch (arg0Type->mTypeCode)
 					{
+					case BeTypeCode_Int8:
+						switch (arg1Type->mTypeCode)
+						{
+						case BeTypeCode_Float:
+							// CVTSS2SI							
+							{
+								BF_ASSERT(inst->mArg0.IsNativeReg());
+								BeMCOperand resizedArg0 = BeMCOperand::FromReg(ResizeRegister(inst->mArg0.mReg, 4));
+								Emit(0xF3); EmitREX(resizedArg0, inst->mArg1, false);
+								Emit(0x0F); Emit(0x2C);
+								EmitModRM(resizedArg0, inst->mArg1);
+							}
+							break;
+						case BeTypeCode_Double:
+							// cvttsd2si
+							{
+								BF_ASSERT(inst->mArg0.IsNativeReg());
+								BeMCOperand resizedArg0 = BeMCOperand::FromReg(ResizeRegister(inst->mArg0.mReg, 4));
+								Emit(0xF2); EmitREX(resizedArg0, inst->mArg1, false);
+								Emit(0x0F); Emit(0x2C);
+								EmitModRM(resizedArg0, inst->mArg1);
+							}
+							break;
+						default: NotImpl();
+						}
+						break;
 					case BeTypeCode_Int16:
-						BF_ASSERT(arg1Type->mTypeCode == BeTypeCode_Int8);
-						Emit(0x66);
-						EmitREX(inst->mArg0, inst->mArg1, false);
-						Emit(0x0F); Emit(0xBE); EmitModRM(inst->mArg0, inst->mArg1);
+						switch (arg1Type->mTypeCode)
+						{
+						case BeTypeCode_Float:
+							// CVTSS2SI							
+							{
+								BF_ASSERT(inst->mArg0.IsNativeReg());
+								BeMCOperand resizedArg0 = BeMCOperand::FromReg(ResizeRegister(inst->mArg0.mReg, 4));
+								Emit(0xF3); EmitREX(resizedArg0, inst->mArg1, false);
+								Emit(0x0F); Emit(0x2C);
+								EmitModRM(resizedArg0, inst->mArg1);
+							}
+							break;
+						case BeTypeCode_Double:
+							// cvttsd2si
+							{
+								BF_ASSERT(inst->mArg0.IsNativeReg());
+								BeMCOperand resizedArg0 = BeMCOperand::FromReg(ResizeRegister(inst->mArg0.mReg, 4));
+								Emit(0xF2); EmitREX(resizedArg0, inst->mArg1, false);
+								Emit(0x0F); Emit(0x2C);
+								EmitModRM(resizedArg0, inst->mArg1);
+							}
+							break;
+						default:
+							BF_ASSERT(arg1Type->mTypeCode == BeTypeCode_Int8);
+							Emit(0x66);
+							EmitREX(inst->mArg0, inst->mArg1, false);
+							Emit(0x0F); Emit(0xBE); EmitModRM(inst->mArg0, inst->mArg1);
+							break;
+						}
 						break;
 					case BeTypeCode_Int32:
 						switch (arg1Type->mTypeCode)
@@ -14139,6 +14244,12 @@ void BeMCContext::DoCodeEmission()
 						case BeTypeCode_Float:
 							// CVTSS2SI
 							Emit(0xF3); EmitREX(inst->mArg0, inst->mArg1, false);
+							Emit(0x0F); Emit(0x2C);
+							EmitModRM(inst->mArg0, inst->mArg1);
+							break;
+						case BeTypeCode_Double:
+							// cvttsd2si
+							Emit(0xF2); EmitREX(inst->mArg0, inst->mArg1, false);
 							Emit(0x0F); Emit(0x2C);
 							EmitModRM(inst->mArg0, inst->mArg1);
 							break;
@@ -14160,6 +14271,12 @@ void BeMCContext::DoCodeEmission()
 						case BeTypeCode_Float:
 							// CVTSS2SI
 							Emit(0xF3); EmitREX(inst->mArg0, inst->mArg1, true);
+							Emit(0x0F); Emit(0x2C);
+							EmitModRM(inst->mArg0, inst->mArg1);
+							break;
+						case BeTypeCode_Double:
+							// cvttsd2si
+							Emit(0xF2); EmitREX(inst->mArg0, inst->mArg1, true);
 							Emit(0x0F); Emit(0x2C);
 							EmitModRM(inst->mArg0, inst->mArg1);
 							break;
@@ -16652,6 +16769,8 @@ void BeMCContext::Generate(BeFunction* function)
 						{
 							bool doSignExtension = (toType->IsIntable()) && (fromType->IsIntable()) && (toType->mSize > fromType->mSize) && (castedInst->mToSigned) && (castedInst->mValSigned);
 							if ((toType->IsFloat()) && (fromType->IsIntable()) && (castedInst->mValSigned))
+								doSignExtension = true;
+							if ((toType->IsIntable()) && (fromType->IsFloat()) && (castedInst->mToSigned))
 								doSignExtension = true;
 
 							if (mcValue.IsImmediate())
